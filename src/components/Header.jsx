@@ -15,20 +15,114 @@ import TiktokIcon from "../icons/TiktokIcon";
 import XIcon from "../icons/XIcon";
 import Logo from "../assets/logo.png";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router-dom";
 import { setSearchQuery } from "../store/productSlice";
 import NotificationDropdown from './NotificationDropdown';
+
+// Tạo một event bus đơn giản để giao tiếp giữa các component
+export const AuthEvents = {
+  listeners: {},
+  subscribe(event, callback) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+    return () => this.unsubscribe(event, callback);
+  },
+  publish(event, data) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(callback => callback(data));
+    }
+  },
+  unsubscribe(event, callback) {
+    if (this.listeners[event]) {
+      this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+    }
+  }
+};
 
 export default function Header() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobileHeaderDisplayed, setIsMobileHeaderDisplayed] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const userMenuRef = useRef(null);
   const userMobileMenuRef = useRef(null);
+
+  // Kiểm tra người dùng đăng nhập khi component được mount
+  useEffect(() => {
+    const checkUserLogin = () => {
+      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setCurrentUser(user);
+        } catch (error) {
+          console.error('Lỗi khi đọc thông tin người dùng:', error);
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    };
+
+    checkUserLogin();
+
+    // Lắng nghe sự kiện thay đổi đăng nhập
+    const unsubscribe = AuthEvents.subscribe('auth-change', checkUserLogin);
+    
+    // Lắng nghe sự kiện thay đổi localStorage
+    const handleStorageChange = (e) => {
+      if (e.key === 'user' || e.key === null) { // null khi clearStorage được gọi
+        checkUserLogin();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      unsubscribe();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Kiểm tra lại thông tin đăng nhập khi route thay đổi
+  useEffect(() => {
+    const checkUserLogin = () => {
+      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setCurrentUser(user);
+        } catch (error) {
+          console.error('Lỗi khi đọc thông tin người dùng:', error);
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    };
+
+    checkUserLogin();
+  }, [location.pathname]);
+
+  // Xử lý đăng xuất
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+    setCurrentUser(null);
+    setIsUserMenuOpen(false);
+    
+    // Phát sự kiện đăng xuất
+    AuthEvents.publish('auth-change', null);
+    
+    navigate('/');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -66,6 +160,148 @@ export default function Header() {
     }
   };
 
+  // Render phần user menu tùy thuộc vào trạng thái đăng nhập
+  const renderUserSection = () => {
+    if (currentUser) {
+      return (
+        <div className="hidden sm:block relative" ref={userMenuRef}>
+          <button
+            className="flex justify-center items-center p-2.5 hover:text-white"
+            onClick={toggleUserMenu}
+          >
+            Xin chào, {currentUser.name}!
+            <div className="w-6 h-6 rounded-full ml-2 bg-gray-600 flex items-center justify-center">
+              <UserIcon className="size-4" />
+            </div>
+          </button>
+          
+          {isUserMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
+              <div className="py-1">
+                <a 
+                  href="/tai-khoan" 
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Thông tin tài khoản
+                </a>
+                <a 
+                  href="/order-history" 
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Lịch sử mua hàng
+                </a>
+                {currentUser.role === 'admin' && (
+                  <a 
+                    href="/admin" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Quản trị website
+                  </a>
+                )}
+                <button 
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <>
+          <a
+            href="/login"
+            className="flex justify-center items-center p-2.5 border-l-[0.5px] border-gray-700 hover:text-white"
+          >
+            <UserIcon className="size-4 mr-1" />
+            <span>Đăng nhập</span>
+          </a>
+          <a
+            href="/register"
+            className="flex justify-center items-center p-2.5 border-x-[0.5px] border-gray-700 hover:text-white"
+          >
+            <UserPlusIcon className="size-4 mr-1" />
+            <span>Đăng ký</span>
+          </a>
+        </>
+      );
+    }
+  };
+
+  // Render phần user menu cho mobile
+  const renderMobileUserMenu = () => {
+    return (
+      <div className="sm:hidden relative" ref={userMobileMenuRef}>
+        <button
+          className="flex justify-center items-center p-2.5 hover:text-white"
+          onClick={toggleUserMenu}
+        >
+          <div className="w-6 h-6 rounded-full flex items-center justify-center">
+            <UserIcon className="size-6" />
+          </div>
+        </button>
+        
+        {isUserMenuOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
+            <div className="py-1">
+              {currentUser ? (
+                <>
+                  <div className="px-4 py-2 text-sm font-medium text-green-600 border-b border-gray-200">
+                    {currentUser.name}
+                  </div>
+                  <a 
+                    href="/tai-khoan" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Thông tin tài khoản
+                  </a>
+                  <a 
+                    href="/order-history" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Lịch sử mua hàng
+                  </a>
+                  {currentUser.role === 'admin' && (
+                    <a 
+                      href="/admin" 
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Quản trị website
+                    </a>
+                  )}
+                  <button 
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                  >
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a 
+                    href="/login" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Đăng nhập
+                  </a>
+                  <a 
+                    href="/register" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Đăng ký
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <header>
       {/* PC layout */}
@@ -93,51 +329,7 @@ export default function Header() {
             </div>
           </div>
           <div className="flex">
-            <a
-              href="/login"
-              className="flex justify-center items-center p-2.5 border-l-[0.5px] border-gray-700 hover:text-white"
-            >
-              <UserIcon className="size-4 mr-1" />
-              <span>Đăng nhập</span>
-            </a>
-            <a
-              href="/register"
-              className="flex justify-center items-center p-2.5 border-x-[0.5px] border-gray-700 hover:text-white"
-            >
-              <UserPlusIcon className="size-4 mr-1" />
-              <span>Đăng ký</span>
-            </a>
-
-            <div className="hidden sm:block relative" ref={userMenuRef}>
-              <button
-                className="flex justify-center items-center p-2.5 hover:text-white"
-                onClick={toggleUserMenu}
-              >
-                Xin chào, Nguyễn Văn A!
-                <div className="w-6 h-6 rounded-full ml-2 bg-gray-600 flex items-center justify-center">
-                  <UserIcon className="size-4" />
-                </div>
-              </button>
-              
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
-                  <div className="py-1">
-                    <a 
-                      href="/order-history" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Lịch sử mua hàng
-                    </a>
-                    <a 
-                      href="/logout" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Đăng xuất
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
+            {renderUserSection()}
           </div>
         </div>
 
@@ -191,9 +383,6 @@ export default function Header() {
 
         <div className="bg-main">
           <div className="flex justify-start items-center font-semibold text-sm max-w-5xl m-auto text-white">
-            {/* <div className="flex items-center justify-center">
-            <Bars3Icon className="size-4 md:size-6 mr-4" />
-          </div> */}
             <ul className="flex items-start text-xs md:text-sm text-left font-normal">
               <li className="py-2.5 px-4 hover:bg-hover text-white">
                 <a href="/">TRANG CHỦ</a>
@@ -287,38 +476,10 @@ export default function Header() {
               <div className="mr-3">
                 <NotificationDropdown />
               </div>
-              <a href="#" className="cursor-pointer hover:opacity-70">
+              <a href="/cart" className="cursor-pointer hover:opacity-70 mr-3">
                 <ShoppingCartIcon className="size-6" />
               </a>
-              <div className="sm:hidden relative" ref={userMobileMenuRef}>
-                <button
-                  className="flex justify-center items-center p-2.5 hover:text-white"
-                  onClick={toggleUserMenu}
-                >
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center">
-                    <UserIcon className="size-6" />
-                  </div>
-                </button>
-                
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
-                    <div className="py-1">
-                      <a 
-                        href="/order-history" 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Lịch sử mua hàng
-                      </a>
-                      <a 
-                        href="/logout" 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Đăng xuất
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {renderMobileUserMenu()}
             </div>
           </div>
 
@@ -375,3 +536,4 @@ export default function Header() {
     </header>
   );
 }
+
