@@ -18,6 +18,8 @@ import { useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { setSearchQuery } from "../store/productSlice";
 import NotificationDropdown from './NotificationDropdown';
+import CartDisplay from './CartDisplay'; // Import component CartDisplay
+import axios from "axios"; 
 
 // Tạo một event bus đơn giản để giao tiếp giữa các component
 export const AuthEvents = {
@@ -185,6 +187,12 @@ export default function Header() {
                   Thông tin tài khoản
                 </a>
                 <a 
+                  href="/cart" 
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Giỏ hàng của tôi
+                </a>
+                <a 
                   href="/order-history" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
@@ -259,6 +267,12 @@ export default function Header() {
                     Thông tin tài khoản
                   </a>
                   <a 
+                    href="/cart" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Giỏ hàng của tôi
+                  </a>
+                  <a 
                     href="/order-history" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
@@ -302,9 +316,59 @@ export default function Header() {
     );
   };
 
+  // Component CartDisplay cho mobile
+  const MobileCartDisplay = () => {
+    const [cartItemCount, setCartItemCount] = useState(0);
+
+    useEffect(() => {
+      const fetchCartInfo = async () => {
+        if (!currentUser) {
+          setCartItemCount(0);
+          return;
+        }
+
+        try {
+          const response = await axios.get(`http://localhost:5000/orders?user_id=${currentUser.id}&status=trong giỏ hàng`);
+          
+          if (response.data.length > 0) {
+            const itemCount = response.data[0].trees.reduce((total, item) => {
+              return total + item.quantity;
+            }, 0);
+            
+            setCartItemCount(itemCount);
+          } else {
+            setCartItemCount(0);
+          }
+        } catch (error) {
+          console.error('Lỗi khi lấy thông tin giỏ hàng (mobile):', error);
+          setCartItemCount(0);
+        }
+      };
+
+      fetchCartInfo();
+
+      // Lắng nghe sự kiện cart-update
+      const unsubscribe = AuthEvents.subscribe('cart-update', fetchCartInfo);
+      
+      return () => {
+        unsubscribe();
+      };
+    }, [currentUser]);
+
+    return (
+      <a href="/cart" className="cursor-pointer hover:opacity-70 mr-3 relative">
+        <ShoppingCartIcon className="size-6" />
+        {cartItemCount > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            {cartItemCount > 99 ? '99+' : cartItemCount}
+          </span>
+        )}
+      </a>
+    );
+  };
+
   return (
     <header>
-      {/* PC layout */}
       <div className="hidden sm:block bg-black">
         <div className="flex justify-between items-center text-gray-400 text-sm max-w-5xl m-auto bg-black">
           <div className="flex items-center justify-start">
@@ -366,13 +430,9 @@ export default function Header() {
                   </div>
                 </form>
 
-                <a
-                  href="/cart"
-                  className="flex items-center justify-between ml-2 text-sm hover:text-gray-400"
-                >
-                  <ShoppingCartIcon className="size-4 md:size-6 mr-1" />
-                  <span className="text-sm">0 Sản phẩm</span>
-                </a>
+                {/* Thay thế phần giỏ hàng cũ bằng component CartDisplay */}
+                <CartDisplay />
+                
                 <div className="ml-4">
                   <NotificationDropdown />
                 </div>
@@ -476,9 +536,8 @@ export default function Header() {
               <div className="mr-3">
                 <NotificationDropdown />
               </div>
-              <a href="/cart" className="cursor-pointer hover:opacity-70 mr-3">
-                <ShoppingCartIcon className="size-6" />
-              </a>
+              {/* Sử dụng component giỏ hàng cho mobile */}
+              <MobileCartDisplay />
               {renderMobileUserMenu()}
             </div>
           </div>
@@ -536,4 +595,3 @@ export default function Header() {
     </header>
   );
 }
-

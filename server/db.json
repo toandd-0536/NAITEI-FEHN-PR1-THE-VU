@@ -266,7 +266,15 @@
       "id": "6",
       "name": "Cây Đa Búp Đỏ",
       "science_name": "Ficus elastica",
-      "ratings": [],
+      "ratings": [
+        {
+          "productId": "6",
+          "username": "rinyh",
+          "rating": 4,
+          "content": "Ad est eos dolore ",
+          "created_at": "2025-04-04T07:02:38.498Z"
+        }
+      ],
       "average_rating": -1,
       "price": 200000,
       "old_price": 250000,
@@ -988,6 +996,59 @@
       "phone": "+8490123456",
       "created_at": "2024-07-01T10:00:00Z",
       "total": 820000
+    },
+    {
+      "id": "ba5b",
+      "user_id": "b960",
+      "user_name": "Doan Duc Toan",
+      "status": "trong giỏ hàng",
+      "trees": [],
+      "address": "",
+      "phone": "0911477985",
+      "created_at": "2025-04-04T06:55:34.327Z",
+      "total": 0
+    },
+    {
+      "id": "496c",
+      "user_id": "b960",
+      "user_name": "Doan Duc Toan",
+      "status": "đã đặt",
+      "trees": [
+        {
+          "id": "3",
+          "name": "Cây Kim Tiền",
+          "price": 180000,
+          "image": "/images/spx2-3.png",
+          "quantity": 5
+        }
+      ],
+      "address": "Nam Định",
+      "phone": "0911477985",
+      "email": "toanymanh@gmail.com",
+      "payment_method": "COD",
+      "created_at": "2025-04-04T07:39:33.013Z",
+      "total": 990000
+    },
+    {
+      "id": "aa69",
+      "user_id": "b960",
+      "user_name": "Doan Duc Toan",
+      "status": "đã đặt",
+      "trees": [
+        {
+          "id": "6",
+          "name": "Cây Đa Búp Đỏ",
+          "price": 200000,
+          "image": "/images/spx2-6.png",
+          "quantity": 2
+        }
+      ],
+      "address": "Hà Nội",
+      "phone": "0123456789",
+      "email": "toanymanh@gmail.com",
+      "payment_method": "Banking",
+      "created_at": "2025-04-04T07:48:48.467Z",
+      "total": 440000
     }
   ],
   "requests": [

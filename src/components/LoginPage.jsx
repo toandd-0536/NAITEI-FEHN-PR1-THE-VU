@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthEvents } from '../components/Header'; // Import AuthEvents từ Header
+import { toast } from 'react-toastify';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -86,9 +87,21 @@ const LoginPage = () => {
         
         setSuccess(true);
         
-        // Chuyển hướng người dùng sau khi đăng nhập thành công
+        // Kiểm tra xem có sản phẩm đang xem trước khi đăng nhập không
+        const lastViewedProduct = sessionStorage.getItem('lastViewedProduct');
+        
+        // Đợi 1.5 giây để hiển thị thông báo thành công
         setTimeout(() => {
-          navigate('/');
+          if (lastViewedProduct) {
+            // Nếu có, chuyển hướng về trang sản phẩm đó
+            const product = JSON.parse(lastViewedProduct);
+            sessionStorage.removeItem('lastViewedProduct'); // Xóa thông tin sau khi sử dụng
+            toast.success('Đăng nhập thành công! Đang quay lại trang sản phẩm.');
+            navigate(`/product/${product.id}`);
+          } else {
+            // Nếu không, chuyển hướng về trang chủ
+            navigate('/');
+          }
         }, 1500);
         
       } catch (error) {
@@ -117,7 +130,7 @@ const LoginPage = () => {
               <div className="text-center py-8">
                 <div className="text-green-500 text-5xl mb-4">✓</div>
                 <h2 className="text-2xl font-semibold mb-4">Đăng nhập thành công!</h2>
-                <p className="text-gray-600">Đang chuyển hướng về trang chủ...</p>
+                <p className="text-gray-600">Đang chuyển hướng...</p>
               </div>
             ) : (
               <>
@@ -203,7 +216,7 @@ const LoginPage = () => {
             </p>
             
             <a
-              href="/register"
+              href="/dang-ky"
               className="inline-block px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
             >
               ĐĂNG KÝ

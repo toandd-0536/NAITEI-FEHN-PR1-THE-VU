@@ -1,20 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   StarIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon
 } from '@heroicons/react/24/solid';
 import { HeartIcon } from '@heroicons/react/24/outline';
 import ReviewForm from './ReviewForm';
 import axios from "axios";
+import { toast } from 'react-toastify';
+import { AuthEvents } from './Header';
 
 export default function ProductDetail() {
+  const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("info");
   const [mainImage, setMainImage] = useState("/api/placeholder/400/400");
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [addingToCart, setAddingToCart] = useState(false);
   const { id } = useParams();
+
+  // Kiểm tra người dùng đã đăng nhập chưa
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setCurrentUser(userData);
+      } catch (error) {
+        console.error('Lỗi khi đọc thông tin người dùng:', error);
+      }
+    }
+  }, []);
+
+  // Lấy thông tin sản phẩm
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -33,16 +53,103 @@ export default function ProductDetail() {
     fetchProduct();
   }, [id]);
 
+  const handleAddToCart = async () => {
+    // Kiểm tra đăng nhập
+    if (!currentUser) {
+      // Lưu thông tin sản phẩm hiện tại để sau khi đăng nhập có thể quay lại
+      sessionStorage.setItem('lastViewedProduct', JSON.stringify({
+        id: product.id,
+        quantity: quantity
+      }));
 
+      toast.info("Vui lòng đăng nhập để mua hàng");
+      navigate('/login');
+      return;
+    }
+
+    setAddingToCart(true);
+
+    try {
+      // Kiểm tra xem đã có giỏ hàng cho người dùng chưa
+      const cartResponse = await axios.get(`http://localhost:5000/orders?user_id=${currentUser.id}&status=trong giỏ hàng`);
+
+      let cartId;
+      let currentCart;
+
+      if (cartResponse.data.length === 0) {
+        // Nếu chưa có giỏ hàng, tạo mới
+        const newCart = {
+          user_id: currentUser.id,
+          user_name: currentUser.name,
+          status: "trong giỏ hàng",
+          trees: [],
+          address: "",
+          phone: currentUser.phone || "",
+          created_at: new Date().toISOString(),
+          total: 0
+        };
+
+        const createResponse = await axios.post('http://localhost:5000/orders', newCart);
+        cartId = createResponse.data.id;
+        currentCart = createResponse.data;
+      } else {
+        // Nếu đã có giỏ hàng, lấy giỏ hàng đầu tiên
+        currentCart = cartResponse.data[0];
+        cartId = currentCart.id;
+      }
+
+      // Kiểm tra xem sản phẩm đã có trong giỏ hàng chưa
+      const existingProductIndex = currentCart.trees.findIndex(
+        item => item.id === product.id
+      );
+
+      let updatedTrees = [...currentCart.trees];
+      let updatedTotal = currentCart.total;
+
+      if (existingProductIndex >= 0) {
+        // Nếu sản phẩm đã có trong giỏ hàng, cập nhật số lượng
+        updatedTrees[existingProductIndex].quantity += quantity;
+      } else {
+        // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+        updatedTrees.push({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.image[0],
+          quantity: quantity
+        });
+      }
+
+      // Tính lại tổng tiền
+      updatedTotal = updatedTrees.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+
+      // Cập nhật giỏ hàng
+      await axios.patch(`http://localhost:5000/orders/${cartId}`, {
+        trees: updatedTrees,
+        total: updatedTotal
+      });
+
+      toast.success("Đã thêm sản phẩm vào giỏ hàng!");
+      AuthEvents.publish('cart-update', null);
+    } catch (error) {
+      console.error("Lỗi khi thêm vào giỏ hàng:", error);
+      toast.error("Có lỗi xảy ra khi thêm vào giỏ hàng");
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   const handleSubmitReview = async (newReview) => {
     if (!product) return;
-  
+
     const updatedRatings = [newReview, ...product.ratings];
-  
+
     setProduct({ ...product, ratings: updatedRatings });
     setActiveTab("reviews");
-  
+
     try {
       await axios.patch(`http://localhost:5000/trees/${product.id}`, {
         ratings: updatedRatings,
@@ -155,8 +262,20 @@ export default function ProductDetail() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
-            <button className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded flex items-center">
-              <span>MUA NGAY</span>
+            <button
+              className={`bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded flex items-center ${addingToCart ? 'opacity-70 cursor-not-allowed' : ''}`}
+              onClick={handleAddToCart}
+              disabled={addingToCart}
+            >
+              {addingToCart ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  ĐANG XỬ LÝ...
+                </>
+              ) : 'MUA NGAY'}
             </button>
             <button className="bg-white border border-gray-300 hover:bg-gray-100 px-4 py-2 rounded">
               <MagnifyingGlassIcon className="h-5 w-5" />
